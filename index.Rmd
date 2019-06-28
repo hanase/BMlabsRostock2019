@@ -1,0 +1,242 @@
+---
+title: "Application of Bayesian Melding"
+author: |
+  | Hana &#352;ev&#269;&#237;kov&#225; 
+  | University of Washington
+date: "6/17/2019"
+output: 
+  html_document:
+      theme: readable
+---
+
+(Based on code of **Anna Neufeld** at the University of Washington)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+eval <- TRUE
+```
+
+# Introduction
+
+This tutorial demostrates how to apply the Bayesian Melding method to results from a microsimulation model in order to access uncertainty around deterministic simulation results. 
+
+Here, we assume we have a microsimulation **model for projecting the number of housing units** in US states, starting from 2010 and projecting to 2030. We run the model several times under different input conditions. We have observed data for 2017 which we use to assess the model uncertainty and propagate it into 2030.
+
+# Required packages
+
+Most of the analysis will be done using basic R. Towards the end we will use the **ggplot2** package which can be installed via:
+
+```{r eval = FALSE}
+install.packages("ggplot2")
+```
+
+# Notation
+
+- $K$: number of groups (here # US states, 52). 
+- $k$: index over $K$ groups.
+- $I$: number of runs (e.g. drawing different inputs from the respective priors, different random seed, different scenarios). 
+- $i$: index over $I$ runs.
+- $y_{k}$: observed data for group $k$, sqrt-transformed.
+- $\mu_{ik}$: model output for $i$-th run and $k$-th group at present time (here 2017), sqrt-transformed.
+- $\Psi_{ik}$: model output for $i$-th run and $k$-th group at future time (here 2030), sqrt-transformed.
+- $a$: estimate of overall model bias.
+- $\sigma^2_i$: estimate of the variance for run $i$.
+- $w_i$: weight for run $i$.
+
+# Prerequisites
+
+- Assessing uncertainty:
+    - observed data for $K$ groups at "present" time, here the number of housing units in 2017 for each state;
+    - simulated results for $K$ groups and $I$ runs at "present" time, i.e. outputs from $I$ runs of the model for 2017;
+- Propagating uncertainty:  
+    - outputs from $I$ runs of the model for  future time point, here 2030.
+
+# Load Example Data
+
+We have a dataset of the number of housing units in 2017 for US states from the Census Bureau (ACS).
+
+- Load observed data for :
+
+    ```{r eval = eval}
+observed <- read.csv("observedHU.csv")
+head(observed)
+```
+
+- In our case, we consider our model as a black box and run it five times, i.e. $I = 5$ (done in advance). Load simulated data from these 5 runs, one file for results in 2017 ("present" time) and one for results in 2030.
+
+    ```{r eval = eval}
+sim17 <- read.csv("simulatedHU2017.csv")
+head(sim17)
+
+sim30 <- read.csv("simulatedHU2030.csv")
+head(sim30)
+```
+
+# Assess uncertainty at present time
+
+- We are using 5 runs and 52 groups:
+    ```{r eval = eval}
+I <- ncol(sim17)
+K <- nrow(sim17)
+cat("\nUsing",  I, "runs and", K, "groups.")
+```
+
+- Apply transformation to derive $\mu_{ik}$, $\Psi_{ik}$, and $y_{k}$: 
+    ```{r eval = eval}
+mu <- sqrt(sim17)
+psi <- sqrt(sim30)
+y <- sqrt(observed[,"HU2017"])
+```
+
+- Compute overall bias as $a = \frac{1}{IK} \sum_{i,k}(y_k - \mu_{ik})$:
+    ```{r eval = eval}
+a <- 1/(I*K) * sum(y - mu)
+a
+```
+
+- Compute variance for each run as $\sigma^2_{i} = \frac{1}{K} \sum_{k}(y_k - a - \mu_{ik})^2$:
+    ```{r eval = eval}
+sigma.sq <- 1/K * apply((y - a - mu)^2, 2, sum)
+sigma.sq
+```
+
+- Compute weights. 
+    - A weight $w_i$ for run $i$ is proportional to the product of densities of $N(a + \mu_{ik}, \sigma_i^2)$ (at $y_k$) over $k$, which can be obtained using the following function:
+        ```{r eval = eval}
+compute.weight <- function(means, y, var) 
+    prod(dnorm(x = y, mean = means, sd = sqrt(var)))
+```
+    - To compute weight for the first run, you would do
+        ```{r eval = eval}
+compute.weight(a + mu[,1], y, sigma.sq)
+```    
+
+    - Derive weights for all runs $i$ and normalize to sum to 1:
+        ```{r eval = eval}
+w <- apply(a + mu, 2, compute.weight, y = y, var = sigma.sq)
+w <- w/sum(w)
+w
+```
+
+- The resulting distribution is 
+$$\pi(\mu_k) = \sum_{i=1}^I w_iN(a + \mu_{ik}, \sigma_i^2)$$
+Plot the distribution for selected states, including the 80% probability interval (dashed) and the observed value (red line). The function `plot.mixtures()` from the `bmaquant.R` file (included in the directory) plots a mixture of normal components given by the components' weights, means and variances:
+    ```{r eval = eval}
+source("bmaquant.R")
+
+par(mfrow = c(2, 3))
+for(k in 1:6) {
+      plot.mixtures(w, means = as.numeric(a + mu[k,]), vars = sigma.sq, 
+                  transform = TRUE, ci = 80, main = rownames(mu)[k], 
+                  xlab = "housing units", ylab = "density")
+      abline(v = observed[k,], col = "red")
+}
+```
+
+
+# Uncertainty in projections
+
+- Recall that the posterior distribution of the quantity of interest is
+$$\pi(\Psi_k) = \sum_{i=1}^I w_iN(a b_a + \Psi_{ik}, \sigma_i^2b_v)$$
+- Set propagation factors for the bias and variance. We assume that our model started in 2010. For simplicity, let's assume that we want to have our projections centered around the simulation results. Thus, we set the bias to 0.
+
+    ```{r eval = eval}
+bv <- (2030 - 2010)/(2017 - 2010)
+ba <- 0
+```
+
+- Posterior means and variance:
+    ```{r eval = eval}
+means30 <- ba * a + psi
+var30 <- bv * sigma.sq
+```
+
+- Plot posterior distribution of housing units in 2030 for selected states:
+    ```{r eval = eval}
+par(mfrow = c(2, 3))
+for(k in 1:6) {
+      plot.mixtures(w, means = as.numeric(means30[k,]), vars = var30, 
+                  transform = TRUE, ci = 80, main = rownames(mu)[k], 
+                  xlab = "housing units", ylab = "density")
+}
+```
+
+- Find the median for Alaska. We'll use the function `bmaquant()` from `bmaquant.R` which returns the given quantile from a mixture of normal components given by weights, means and variances:
+
+    ```{r eval = eval}
+head(bmaquant)
+bmaquant(0.5, w, means = as.numeric(means30["Alaska",]), vars = var30)^2
+```
+
+- Find the medians and the 95% probability intervals for all states:
+
+    ```{r eval = eval}
+quants <- NULL
+for(k in 1:K) {
+      low <- bmaquant(0.025, w, means = as.numeric(means30[k,]), vars = var30)
+      high <- bmaquant(0.975, w, means = as.numeric(means30[k,]), vars = var30)
+      median <- bmaquant(0.5, w, means = as.numeric(means30[k,]), vars = var30)
+      quants <- rbind(quants, 
+                      data.frame(low = low^2, high = high^2, median = median^2))
+}
+quants$state <- rownames(sim30)
+head(quants)
+```
+
+- Plot probability intervals as error bars for selected states, including the raw simulation results: 
+    ```{r eval = eval}
+library(ggplot2)
+
+# subset records to plot
+qdata <- subset(quants, low > 1000000 & high < 3000000)
+
+# convert simulated results into long format
+# and merge with quantile data
+sim30wide <- sim30
+sim30wide$state <- rownames(sim30)
+head(sim30wide)
+sim30long <- reshape(sim30wide, direction = "long", 
+                      varying = 1:5, v.names = "S")
+
+qdata <- merge(qdata, sim30long)
+
+# plot quantiles as bars and simulated data as dots
+g <- ggplot(qdata, aes(x = state)) + 
+        geom_errorbar(aes(ymin = low, ymax = high), color = "red") + 
+        geom_point(aes(y = median), color = "red") +
+        geom_point(aes(y = S), size = 0.7) + 
+        xlab("") + ylab("housing units") +
+        scale_x_discrete(limits = rev(levels(factor(qdata$state)))) + 
+        coord_flip()
+print(g)
+```
+
+- Having a distribution function available, one can extract any probability of interest. For example, derive the probability that Utah will have less than 1,250,000 housing units by 2030. We will use the `bmacdf()` function that returns the cumulative distribution function of a mixture of normal components at a given point:
+
+    ```{r eval = eval}
+bmacdf
+bmacdf(sqrt(1250000), w, as.numeric(means30["Utah",]), var30)
+
+# compare with simulated values
+sim30["Utah",]
+```
+
+# Multiple indicators
+
+In a situation when there are more than one indicators on which basis we want to assess the uncertainty and compute weights, one can proceed as follows:
+
+1. For each indicator $l$ with $l = 1,\dots,L$, compute the bias $a_l$, variance $\sigma^2_{il}$ and the weight $w'_{il}$ as above.
+
+2. For each run $i$ compute its weight as $w_i = \prod_l w'_{il}$.
+
+3. The posterior distribution for indicator $l$ is defined as
+$$\pi(\Psi_{kl}) = \sum_{i=1}^I w_iN(a_l b_l^a + \Psi_{ikl}, \sigma_{il}^2b_l^v)$$
+
+# References
+
+[Ševčíková, H., Raftery, A.E., Waddell, P. (2007). Assessing uncertainty in urban simulations using Bayesian melding. Transportation Research, Vol. 41B, Issue 6, 652-669.](http://www.stat.washington.edu/raftery/Research/PDF/sevcikova2007.pdf)
+
+[Ševčíková, H., Raftery, A.E., Waddell, P. (2011). Uncertain benefits: Application of Bayesian melding to the Alaskan Way Viaduct in Seattle. Transportation Research Part A, 45, 540-553.](https://www.sciencedirect.com/science/article/pii/S0965856411000553)
+
+[Ševčíková, H., Simonson, M., Jensen, M. (2015). Assessing and Integrating Uncertainty into Land Use Forecasting. Journal of Transport and Land Use, 8(3).](https://www.jtlu.org/index.php/jtlu/article/view/614)
+
