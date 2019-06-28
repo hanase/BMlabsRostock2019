@@ -3,7 +3,7 @@ title: "Application of Bayesian Melding"
 author: |
   | Hana &#352;ev&#269;&#237;kov&#225; 
   | University of Washington
-date: "6/17/2019"
+date: "6/28/2019"
 output: 
   html_document:
       theme: readable
@@ -19,6 +19,11 @@ eval <- TRUE
 # Introduction
 
 This tutorial demostrates how to apply the Bayesian Melding method to results from a microsimulation model in order to access uncertainty around deterministic simulation results. 
+
+Download or clone this repository using for example 
+```
+git clone https://github.com/hanase/BMlabsRostock2019 BMlabs
+```
 
 Here, we assume we have a microsimulation **model for projecting the number of housing units** in US states, starting from 2010 and projecting to 2030. We run the model several times under different input conditions. We have observed data for 2017 which we use to assess the model uncertainty and propagate it into 2030.
 
@@ -55,9 +60,12 @@ install.packages("ggplot2")
 
 We have a dataset of the number of housing units in 2017 for US states from the Census Bureau (ACS).
 
-- Load observed data for :
+- Move into the downloaded directory and load the observed data:
 
     ```{r eval = eval}
+getwd()
+setwd("BMlabs")
+
 observed <- read.csv("observedHU.csv")
 head(observed)
 ```
