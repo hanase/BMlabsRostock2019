@@ -13,15 +13,16 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-eval <- TRUE
+eval <- FALSE
 ```
 
 # Introduction
 
 This tutorial demostrates how to apply the Bayesian Melding method to results from a microsimulation model in order to access uncertainty around deterministic simulation results. 
 
-Download or clone this repository using for example 
-```
+Download or clone this repository using for example (from the command line):
+
+```{bash eval = FALSE}
 git clone https://github.com/hanase/BMlabsRostock2019 BMlabs
 ```
 
