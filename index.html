@@ -188,8 +188,8 @@ sim30 &lt;- read.csv(&quot;simulatedHU2030.csv&quot;)
 head(sim30)</code></pre></li>
 </ul>
 </div>
-<div id="assess-uncertainty-at-present-time" class="section level1">
-<h1>Assess uncertainty at present time</h1>
+<div id="uncertainty-at-present-time" class="section level1">
+<h1>Uncertainty at present time</h1>
 <ul>
 <li><p>We are using 5 runs and 52 groups:</p>
 <pre class="r"><code>I &lt;- ncol(sim17)
@@ -198,12 +198,12 @@ cat(&quot;\nUsing&quot;,  I, &quot;runs and&quot;, K, &quot;groups.&quot;)</code
 <li><p>Apply transformation to derive <span class="math inline">\(\mu_{ik}\)</span>, <span class="math inline">\(\Psi_{ik}\)</span>, and <span class="math inline">\(y_{k}\)</span>:</p>
 <pre class="r"><code>mu &lt;- sqrt(sim17)
 psi &lt;- sqrt(sim30)
-y &lt;- sqrt(observed[,&quot;HU2017&quot;])</code></pre></li>
-<li><p>Compute overall bias as <span class="math inline">\(a = \frac{1}{IK} \sum_{i,k}(y_k - \mu_{ik})\)</span>:</p>
-<pre class="r"><code>a &lt;- 1/(I*K) * sum(y - mu)
+y &lt;- sqrt(observed)[,1] # convert to vector</code></pre></li>
+<li><p>Estimate overall bias as <span class="math inline">\(a = \frac{1}{IK} \sum_{i,k}(y_k - \mu_{ik})\)</span>:</p>
+<pre class="r"><code>a &lt;- sum(y - mu)/(K*I)
 a</code></pre></li>
 <li><p>Compute variance for each run as <span class="math inline">\(\sigma^2_{i} = \frac{1}{K} \sum_{k}(y_k - a - \mu_{ik})^2\)</span>:</p>
-<pre class="r"><code>sigma.sq &lt;- 1/K * apply((y - a - mu)^2, 2, sum)
+<pre class="r"><code>sigma.sq &lt;- apply((y - a - mu)^2, 2, mean)
 sigma.sq</code></pre></li>
 <li>Compute weights.
 <ul>
@@ -233,9 +233,9 @@ for(k in 1:6) {
 <h1>Uncertainty in projections</h1>
 <ul>
 <li>Recall that the posterior distribution of the quantity of interest is <span class="math display">\[\pi(\Psi_k) = \sum_{i=1}^I w_iN(a b_a + \Psi_{ik}, \sigma_i^2b_v)\]</span></li>
-<li><p>Set propagation factors for the bias and variance. We assume that our model started in 2010. For simplicity, let’s assume that we want to have our projections centered around the simulation results. Thus, we set the bias to 0.</p>
+<li><p>Set propagation factors for the bias and variance. We assume that our model started in 2010. In order not to greatly deviate from the simulated results, we will keep the bias constant.</p>
 <pre class="r"><code>bv &lt;- (2030 - 2010)/(2017 - 2010)
-ba &lt;- 0</code></pre></li>
+ba &lt;- 1</code></pre></li>
 <li><p>Posterior means and variance:</p>
 <pre class="r"><code>means30 &lt;- ba * a + psi
 var30 &lt;- bv * sigma.sq</code></pre></li>
@@ -285,12 +285,12 @@ g &lt;- ggplot(qdata, aes(x = state)) +
     scale_x_discrete(limits = rev(levels(factor(qdata$state)))) + 
     coord_flip()
 print(g)</code></pre></li>
-<li><p>Having a distribution function available, one can extract any probability of interest. For example, derive the probability that Utah will have less than 1,250,000 housing units by 2030. We will use the <code>bmacdf()</code> function that returns the cumulative distribution function of a mixture of normal components at a given point:</p>
+<li><p>Having a distribution function available, one can extract any probability of interest. For example, derive the probability that Kansas will have less than 1,320,000 housing units by 2030. We will use the <code>bmacdf()</code> function that returns the cumulative distribution function of a mixture of normal components at a given point:</p>
 <pre class="r"><code>bmacdf
-bmacdf(sqrt(1250000), w, as.numeric(means30[&quot;Utah&quot;,]), var30)
+bmacdf(sqrt(1320000), w, as.numeric(means30[&quot;Kansas&quot;,]), var30)
 
 # compare with simulated values
-sim30[&quot;Utah&quot;,]</code></pre></li>
+sim30[&quot;Kansas&quot;,]</code></pre></li>
 </ul>
 </div>
 <div id="multiple-indicators" class="section level1">

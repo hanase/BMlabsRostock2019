@@ -81,7 +81,7 @@ sim30 <- read.csv("simulatedHU2030.csv")
 head(sim30)
 ```
 
-# Assess uncertainty at present time
+# Uncertainty at present time
 
 - We are using 5 runs and 52 groups:
     ```{r eval = eval}
@@ -94,18 +94,18 @@ cat("\nUsing",  I, "runs and", K, "groups.")
     ```{r eval = eval}
 mu <- sqrt(sim17)
 psi <- sqrt(sim30)
-y <- sqrt(observed[,"HU2017"])
+y <- sqrt(observed)[,1] # convert to vector
 ```
 
-- Compute overall bias as $a = \frac{1}{IK} \sum_{i,k}(y_k - \mu_{ik})$:
+- Estimate overall bias as $a = \frac{1}{IK} \sum_{i,k}(y_k - \mu_{ik})$:
     ```{r eval = eval}
-a <- 1/(I*K) * sum(y - mu)
+a <- sum(y - mu)/(K*I)
 a
 ```
 
 - Compute variance for each run as $\sigma^2_{i} = \frac{1}{K} \sum_{k}(y_k - a - \mu_{ik})^2$:
     ```{r eval = eval}
-sigma.sq <- 1/K * apply((y - a - mu)^2, 2, sum)
+sigma.sq <- apply((y - a - mu)^2, 2, mean)
 sigma.sq
 ```
 
@@ -147,11 +147,11 @@ for(k in 1:6) {
 
 - Recall that the posterior distribution of the quantity of interest is
 $$\pi(\Psi_k) = \sum_{i=1}^I w_iN(a b_a + \Psi_{ik}, \sigma_i^2b_v)$$
-- Set propagation factors for the bias and variance. We assume that our model started in 2010. For simplicity, let's assume that we want to have our projections centered around the simulation results. Thus, we set the bias to 0.
+- Set propagation factors for the bias and variance. We assume that our model started in 2010. In order not to greatly deviate from the simulated results, we will keep the bias constant.
 
     ```{r eval = eval}
 bv <- (2030 - 2010)/(2017 - 2010)
-ba <- 0
+ba <- 1
 ```
 
 - Posterior means and variance:
@@ -220,14 +220,14 @@ g <- ggplot(qdata, aes(x = state)) +
 print(g)
 ```
 
-- Having a distribution function available, one can extract any probability of interest. For example, derive the probability that Utah will have less than 1,250,000 housing units by 2030. We will use the `bmacdf()` function that returns the cumulative distribution function of a mixture of normal components at a given point:
+- Having a distribution function available, one can extract any probability of interest. For example, derive the probability that Kansas will have less than 1,320,000 housing units by 2030. We will use the `bmacdf()` function that returns the cumulative distribution function of a mixture of normal components at a given point:
 
     ```{r eval = eval}
 bmacdf
-bmacdf(sqrt(1250000), w, as.numeric(means30["Utah",]), var30)
+bmacdf(sqrt(1320000), w, as.numeric(means30["Kansas",]), var30)
 
 # compare with simulated values
-sim30["Utah",]
+sim30["Kansas",]
 ```
 
 # Multiple indicators

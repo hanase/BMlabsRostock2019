@@ -1,5 +1,5 @@
 # Written: Sept 12, 2003 (Adrian Raftery), 
-# Modified: Nov 15, 2007 (Hana Sevcikova)
+# Modified: Nov 15, 2007, June 2019 (Hana Sevcikova)
 
 bmaquant <- function (alpha, w, means, vars, niter=14) {
     # Find the alpha quantile of the n-component mixture
@@ -97,19 +97,18 @@ plot.mixtures <- function(w, means, vars, transform=FALSE,
 }
 
 #--------------------------------------
-#Here's the R code for finding the mixture CDF at a point
+# Here's the R code for finding the mixture CDF at a point
 #--------------------------------------
 
 bmacdf <- function (x, w, means, vars) {
     # Sept 12, 2003 (Adrian Raftery)
     # Find the BMA cdf at x
     # Inputs:
-    #  x            value at which cdf is required
+    #  x    value at which cdf is required
     
     sig <- sqrt (vars)
     sum (w * pnorm (rep(x,length(means)), means, sig) )
 }
-
 
 dnorm.trunc<-function(x, mean, sd, low = NULL, high  =NULL){
     # normal density truncated between low and high
